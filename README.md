@@ -90,6 +90,8 @@ curl -X GET "http://localhost:10000/v1/models" \
   -H "Authorization: Bearer YOUR_ELEVENLABS_API_KEY"
 ```
 
+`/v1/models` is backed by ElevenLabs `GET /v1/convai/llm/list`.
+
 ### Chat Completion
 
 ```bash

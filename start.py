@@ -101,24 +101,24 @@ async def list_models(
         raise HTTPException(status_code=401, detail="Invalid or missing Authorization header")
 
     api_key = authorization.split(" ")[1]
-    url = "https://api.elevenlabs.io/v1/convai/llm-usage/calculate"
-    headers = {
-        "xi-api-key": api_key,
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "prompt_length": 1,
-        "number_of_pages": 0,
-        "rag_enabled": False
-    }
-    response = requests.post(url, headers=headers, json=payload, timeout=20)
+    url = "https://api.elevenlabs.io/v1/convai/llm/list"
+    headers = { "xi-api-key": api_key }
+    response = requests.get(url, headers=headers, timeout=20)
 
     if response.status_code >= 400:
         raise HTTPException(status_code=502, detail=response.text)
 
     data = response.json()
-    llm_prices = data.get("llm_prices", [])
-    models = [ModelObject(id=item["llm"]) for item in llm_prices]
+    llms = data.get("llms", [])
+    seen: set[str] = set()
+    models: List[ModelObject] = []
+
+    for item in llms:
+        llm = item.get("llm")
+
+        if isinstance(llm, str) and llm and llm != "custom-llm" and llm not in seen:
+            seen.add(llm)
+            models.append(ModelObject(id=llm))
 
     return ModelListResponse(data=models)
 
