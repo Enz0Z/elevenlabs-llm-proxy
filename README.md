@@ -11,6 +11,7 @@ This project exposes a minimal API surface that looks like OpenAI's Chat Complet
 - Bearer-token auth using your ElevenLabs API key.
 - Optional model override forwarded to ElevenLabs.
 - Developer/system prompts forwarded as an agent prompt override.
+- Configurable ElevenLabs API base URL via environment variable.
 
 ## How It Works
 
@@ -35,9 +36,17 @@ Create a `.env` file:
 
 ```env
 ELEVENLABS_AGENT_ID=your_agent_id
+ELEVENLABS_API_BASE_URL=https://api.elevenlabs.io
 ```
 
 You can copy from `.env.example`.
+
+Supported ElevenLabs API base URLs:
+
+- `https://api.elevenlabs.io`
+- `https://api.us.elevenlabs.io`
+- `https://api.eu.residency.elevenlabs.io`
+- `https://api.in.residency.elevenlabs.io`
 
 ## Run Locally
 

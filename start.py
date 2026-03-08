@@ -14,6 +14,10 @@ from environ import getenv
 app = FastAPI()
 
 ELEVENLABS_AGENT_ID = getenv("ELEVENLABS_AGENT_ID", "")
+DEFAULT_ELEVENLABS_API_BASE_URL = "https://api.elevenlabs.io"
+ELEVENLABS_API_BASE_URL = (
+    getenv("ELEVENLABS_API_BASE_URL", DEFAULT_ELEVENLABS_API_BASE_URL) or DEFAULT_ELEVENLABS_API_BASE_URL
+).rstrip("/")
 
 CHAT_ROLE = Literal["developer", "system", "user", "assistant", "tool"]
 
@@ -61,6 +65,10 @@ class ModelListResponse(BaseModel):
     object: str = "list"
     data: List[ModelObject]
 
+def build_elevenlabs_api_url(path: str) -> str:
+    normalized_path = path if path.startswith("/") else f"/{path}"
+    return f"{ELEVENLABS_API_BASE_URL}{normalized_path}"
+
 def build_initiation_payload(model: Optional[str], developer_text: str) -> Dict[str, Any]:
     agent_prompt: Dict[str, Any] = { "prompt": developer_text or "" }
 
@@ -77,7 +85,7 @@ def build_initiation_payload(model: Optional[str], developer_text: str) -> Dict[
     }
 
 def get_signed_url(api_key: str) -> str:
-    url = "https://api.elevenlabs.io/v1/convai/conversation/get-signed-url"
+    url = build_elevenlabs_api_url("/v1/convai/conversation/get-signed-url")
     headers = { "xi-api-key": api_key }
     params = { "agent_id": ELEVENLABS_AGENT_ID }
     response = requests.get(url, headers=headers, params=params, timeout=20)
@@ -101,7 +109,7 @@ async def list_models(
         raise HTTPException(status_code=401, detail="Invalid or missing Authorization header")
 
     api_key = authorization.split(" ")[1]
-    url = "https://api.elevenlabs.io/v1/convai/llm/list"
+    url = build_elevenlabs_api_url("/v1/convai/llm/list")
     headers = { "xi-api-key": api_key }
     response = requests.get(url, headers=headers, timeout=20)
 
