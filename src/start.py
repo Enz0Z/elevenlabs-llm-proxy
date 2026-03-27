@@ -150,10 +150,25 @@ async def chat_completions(
     api_key = authorization.split(" ")[1]
     developer_parts = [m.content for m in req.messages if m.role in ("developer", "system")]
     developer_text = "\n".join([p for p in developer_parts if p.strip()])
-    user_texts = [m.content for m in req.messages if m.role == "user"]
 
-    if not user_texts:
+    # Separate conversation history from the last user message.
+    # All user/assistant messages except the last user message become history
+    # that gets injected into the system prompt.
+    non_system_messages = [m for m in req.messages if m.role in ("user", "assistant")]
+
+    if not non_system_messages or non_system_messages[-1].role != "user":
         raise HTTPException(status_code=400, detail="No user messages provided")
+
+    last_user_message = non_system_messages[-1].content
+    history_messages = non_system_messages[:-1]
+
+    if history_messages:
+        history_lines = []
+        for m in history_messages:
+            label = "User" if m.role == "user" else "Assistant"
+            history_lines.append(f"{label}: {m.content}")
+        history_block = "\n".join(history_lines)
+        developer_text = f"{developer_text}\n\n## Conversation history:\n{history_block}".strip()
 
     signed_url = get_signed_url(api_key)
     agent_response_text: Optional[str] = None
@@ -164,8 +179,7 @@ async def chat_completions(
 
         await websocket.send(json.dumps(build_initiation_payload(req.model, developer_text)))
 
-        for text in user_texts:
-            await websocket.send(json.dumps({"type": "user_message", "text": text}))
+        await websocket.send(json.dumps({"type": "user_message", "text": last_user_message}))
 
         async for message in websocket:
             event = json.loads(message)

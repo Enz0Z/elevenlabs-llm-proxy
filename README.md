@@ -11,6 +11,7 @@ This project exposes a minimal API surface that looks like OpenAI's Chat Complet
 - Bearer-token auth using your ElevenLabs API key.
 - Optional model override forwarded to ElevenLabs.
 - Developer/system prompts forwarded as an agent prompt override.
+- Multi-turn conversation history support.
 - Configurable ElevenLabs API base URL via environment variable.
 
 ## How It Works
@@ -21,8 +22,44 @@ This project exposes a minimal API surface that looks like OpenAI's Chat Complet
    - Bearer API key from `Authorization` header
 3. It opens the WebSocket, sends:
    - conversation initiation payload (including prompt/model override)
-   - all `user` messages
+   - the last `user` message
 4. It waits for the first `agent_response` event and returns it as an OpenAI-style chat completion response.
+
+### Conversation History
+
+Since each request opens a new WebSocket (stateless), multi-turn context is handled by injecting previous messages into the system prompt.
+
+When a request contains multiple `user`/`assistant` messages, the proxy:
+
+1. Takes the **last `user` message** and sends it as the actual WebSocket user message.
+2. All preceding `user` and `assistant` messages are formatted as a conversation history block and **appended to the system prompt**.
+
+For example, given this request:
+
+```json
+{
+  "messages": [
+    {"role": "system", "content": "Be concise."},
+    {"role": "user", "content": "Hi, my name is Enzo"},
+    {"role": "assistant", "content": "Hello Enzo! How can I help you?"},
+    {"role": "user", "content": "What is my name?"}
+  ]
+}
+```
+
+The proxy will:
+
+- Set the agent prompt to:
+  ```
+  Be concise.
+
+  ## Conversation history:
+  User: Hi, my name is Enzo
+  Assistant: Hello Enzo! How can I help you?
+  ```
+- Send `"What is my name?"` as the WebSocket user message.
+
+If the request only has a single `user` message (no history), nothing extra is added to the prompt and it works as a simple single-turn request.
 
 ## Requirements
 
@@ -118,9 +155,10 @@ curl -X POST "http://localhost:10000/v1/chat/completions" \
 
 ## Request/Response Notes
 
-- `messages` must include at least one `user` message.
+- `messages` must include at least one `user` message (and it must be the last non-system message).
 - `developer` and `system` messages are merged and forwarded as prompt override.
-- `assistant` and `tool` messages are accepted by schema but currently not replayed to ElevenLabs.
+- `assistant` and `user` messages prior to the last `user` message are injected as conversation history in the prompt.
+- `tool` messages are accepted by schema but not used.
 - Streaming is not implemented.
 - `usage` fields are currently returned as `0`.
 
