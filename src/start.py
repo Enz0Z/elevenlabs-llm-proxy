@@ -6,7 +6,7 @@ import httpx
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from websockets.asyncio.client import connect
-from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
+from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK, InvalidStatus
 
 from src.environ import getenv
 
@@ -232,6 +232,10 @@ async def chat_completions(
 
         if agent_response_text is None:
             raise HTTPException(status_code=502, detail="No agent_response received")
+
+    except InvalidStatus as e:
+        status = e.response.status_code
+        raise HTTPException(status_code=status, detail=f"ElevenLabs WebSocket rejected: HTTP {status}")
 
     except (ConnectionClosedOK, ConnectionClosedError) as e:
         raise HTTPException(status_code=502, detail=f"WebSocket closed: {e}")
