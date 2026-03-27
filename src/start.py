@@ -1,13 +1,12 @@
 import json
 import time
-import uuid
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Dict, List, Literal, Optional
 
 import requests
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from websockets.asyncio.client import connect
-from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
+from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
 from src.environ import getenv
 
@@ -29,6 +28,8 @@ class ChatMessage(BaseModel):
 class ChatCompletionsRequest(BaseModel):
     model: Optional[str] = None
     messages: List[ChatMessage]
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
 
 class ResponseMessage(BaseModel):
     role: Literal["assistant"]
@@ -72,13 +73,18 @@ def build_elevenlabs_api_url(path: str) -> str:
     return f"{ELEVENLABS_API_BASE_URL}{normalized_path}"
 
 
-def build_initiation_payload(model: Optional[str], developer_text: str) -> Dict[str, Any]:
+def build_initiation_payload(
+    model: Optional[str],
+    developer_text: str,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+) -> Dict[str, Any]:
     agent_prompt: Dict[str, Any] = {"prompt": developer_text or ""}
 
     if model:
         agent_prompt["llm"] = model
 
-    return {
+    payload: Dict[str, Any] = {
         "type": "conversation_initiation_client_data",
         "conversation_config_override": {
             "agent": {
@@ -86,6 +92,17 @@ def build_initiation_payload(model: Optional[str], developer_text: str) -> Dict[
             }
         }
     }
+
+    extra_body: Dict[str, Any] = {}
+    if temperature is not None:
+        extra_body["temperature"] = temperature
+    if max_tokens is not None:
+        extra_body["max_tokens"] = max_tokens
+
+    if extra_body:
+        payload["custom_llm_extra_body"] = extra_body
+
+    return payload
 
 
 def get_signed_url(api_key: str) -> str:
@@ -172,18 +189,26 @@ async def chat_completions(
 
     signed_url = get_signed_url(api_key)
     agent_response_text: Optional[str] = None
+    conversation_id: Optional[str] = None
     websocket = None
 
     try:
         websocket = await connect(signed_url)
 
-        await websocket.send(json.dumps(build_initiation_payload(req.model, developer_text)))
+        await websocket.send(json.dumps(build_initiation_payload(
+            req.model, developer_text, req.temperature, req.max_tokens
+        )))
 
         await websocket.send(json.dumps({"type": "user_message", "text": last_user_message}))
 
         async for message in websocket:
             event = json.loads(message)
             etype = event.get("type")
+
+            if etype == "conversation_initiation_metadata":
+                metadata = event.get("conversation_initiation_metadata_event", {})
+                conversation_id = metadata.get("conversation_id")
+                continue
 
             if etype == "ping":
                 ping_event = event.get("ping_event", {})
@@ -215,7 +240,7 @@ async def chat_completions(
                 pass
 
     return ChatCompletionsResponse(
-        id=f"chatcmpl-{uuid.uuid4().hex}",
+        id=f"chatcmpl-{conversation_id}",
         object="chat.completion",
         created=int(time.time()),
         model=req.model or "unknown",

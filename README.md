@@ -12,6 +12,8 @@ This project exposes a minimal API surface that looks like OpenAI's Chat Complet
 - Optional model override forwarded to ElevenLabs.
 - Developer/system prompts forwarded as an agent prompt override.
 - Multi-turn conversation history support.
+- `temperature` and `max_tokens` forwarded to ElevenLabs via `custom_llm_extra_body`.
+- Response ID uses the real ElevenLabs conversation ID.
 - Configurable ElevenLabs API base URL via environment variable.
 
 ## How It Works
@@ -146,6 +148,8 @@ curl -X POST "http://localhost:10000/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4.1-mini",
+    "temperature": 0.5,
+    "max_tokens": 200,
     "messages": [
       {"role": "developer", "content": "Be concise."},
       {"role": "user", "content": "Write a one-line product tagline."}
@@ -153,12 +157,16 @@ curl -X POST "http://localhost:10000/v1/chat/completions" \
   }'
 ```
 
+`temperature` and `max_tokens` are optional. When provided, they are forwarded to ElevenLabs via `custom_llm_extra_body` in the conversation initiation payload.
+
 ## Request/Response Notes
 
 - `messages` must include at least one `user` message (and it must be the last non-system message).
 - `developer` and `system` messages are merged and forwarded as prompt override.
 - `assistant` and `user` messages prior to the last `user` message are injected as conversation history in the prompt.
 - `tool` messages are accepted by schema but not used.
+- `temperature` and `max_tokens` are forwarded to ElevenLabs when provided.
+- The response `id` field contains the real ElevenLabs conversation ID (e.g. `chatcmpl-conv_abc123`).
 - Streaming is not implemented.
 - `usage` fields are currently returned as `0`.
 
