@@ -114,13 +114,13 @@ async def get_signed_url(api_key: str) -> str:
         response = await client.get(url, headers=headers, params=params, timeout=20)
 
     if response.status_code >= 400:
-        raise HTTPException(status_code=502, detail=response.text)
+        raise HTTPException(status_code=response.status_code, detail=response.text)
 
     data = response.json()
     signed_url = data.get("signed_url")
 
     if not signed_url:
-        raise HTTPException(status_code=502, detail="Missing signed_url")
+        raise HTTPException(status_code=502, detail="Missing signed_url in ElevenLabs response")
 
     return signed_url
 
@@ -140,7 +140,7 @@ async def list_models(
         response = await client.get(url, headers=headers, timeout=20)
 
     if response.status_code >= 400:
-        raise HTTPException(status_code=502, detail=response.text)
+        raise HTTPException(status_code=response.status_code, detail=response.text)
 
     data = response.json()
     llms = data.get("llms", [])
@@ -231,14 +231,14 @@ async def chat_completions(
                 break
 
         if agent_response_text is None:
-            raise HTTPException(status_code=502, detail="No agent_response received")
+            raise HTTPException(status_code=504, detail="No agent_response received from ElevenLabs")
 
     except InvalidStatus as e:
         status = e.response.status_code
         raise HTTPException(status_code=status, detail=f"ElevenLabs WebSocket rejected: HTTP {status}")
 
     except (ConnectionClosedOK, ConnectionClosedError) as e:
-        raise HTTPException(status_code=502, detail=f"WebSocket closed: {e}")
+        raise HTTPException(status_code=502, detail=f"ElevenLabs WebSocket closed unexpectedly: {e}")
 
     finally:
         if websocket:
