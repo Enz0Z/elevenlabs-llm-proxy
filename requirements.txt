@@ -1,6 +1,6 @@
 fastapi
 pydantic
-requests
+httpx
 websockets
 uvicorn
 python-dotenv

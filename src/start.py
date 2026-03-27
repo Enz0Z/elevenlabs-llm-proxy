@@ -2,7 +2,7 @@ import json
 import time
 from typing import Any, Dict, List, Literal, Optional
 
-import requests
+import httpx
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from websockets.asyncio.client import connect
@@ -105,11 +105,13 @@ def build_initiation_payload(
     return payload
 
 
-def get_signed_url(api_key: str) -> str:
+async def get_signed_url(api_key: str) -> str:
     url = build_elevenlabs_api_url("/v1/convai/conversation/get-signed-url")
     headers = {"xi-api-key": api_key}
     params = {"agent_id": ELEVENLABS_AGENT_ID}
-    response = requests.get(url, headers=headers, params=params, timeout=20)
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers, params=params, timeout=20)
 
     if response.status_code >= 400:
         raise HTTPException(status_code=502, detail=response.text)
@@ -133,7 +135,9 @@ async def list_models(
     api_key = authorization.split(" ")[1]
     url = build_elevenlabs_api_url("/v1/convai/llm/list")
     headers = {"xi-api-key": api_key}
-    response = requests.get(url, headers=headers, timeout=20)
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers, timeout=20)
 
     if response.status_code >= 400:
         raise HTTPException(status_code=502, detail=response.text)
@@ -187,7 +191,7 @@ async def chat_completions(
         history_block = "\n".join(history_lines)
         developer_text = f"{developer_text}\n\n## Conversation history:\n{history_block}".strip()
 
-    signed_url = get_signed_url(api_key)
+    signed_url = await get_signed_url(api_key)
     agent_response_text: Optional[str] = None
     conversation_id: Optional[str] = None
     websocket = None
