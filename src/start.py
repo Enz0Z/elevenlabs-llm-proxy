@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
-from environ import getenv
+from src.environ import getenv
 
 app = FastAPI()
 
@@ -20,6 +20,7 @@ ELEVENLABS_API_BASE_URL = (
 ).rstrip("/")
 
 CHAT_ROLE = Literal["developer", "system", "user", "assistant", "tool"]
+
 
 class ChatMessage(BaseModel):
     role: CHAT_ROLE
@@ -65,12 +66,14 @@ class ModelListResponse(BaseModel):
     object: str = "list"
     data: List[ModelObject]
 
+
 def build_elevenlabs_api_url(path: str) -> str:
     normalized_path = path if path.startswith("/") else f"/{path}"
     return f"{ELEVENLABS_API_BASE_URL}{normalized_path}"
 
+
 def build_initiation_payload(model: Optional[str], developer_text: str) -> Dict[str, Any]:
-    agent_prompt: Dict[str, Any] = { "prompt": developer_text or "" }
+    agent_prompt: Dict[str, Any] = {"prompt": developer_text or ""}
 
     if model:
         agent_prompt["llm"] = model
@@ -84,10 +87,11 @@ def build_initiation_payload(model: Optional[str], developer_text: str) -> Dict[
         }
     }
 
+
 def get_signed_url(api_key: str) -> str:
     url = build_elevenlabs_api_url("/v1/convai/conversation/get-signed-url")
-    headers = { "xi-api-key": api_key }
-    params = { "agent_id": ELEVENLABS_AGENT_ID }
+    headers = {"xi-api-key": api_key}
+    params = {"agent_id": ELEVENLABS_AGENT_ID}
     response = requests.get(url, headers=headers, params=params, timeout=20)
 
     if response.status_code >= 400:
@@ -101,6 +105,7 @@ def get_signed_url(api_key: str) -> str:
 
     return signed_url
 
+
 @app.get("/v1/models", response_model=ModelListResponse)
 async def list_models(
     authorization: Optional[str] = Header(default=None),
@@ -110,7 +115,7 @@ async def list_models(
 
     api_key = authorization.split(" ")[1]
     url = build_elevenlabs_api_url("/v1/convai/llm/list")
-    headers = { "xi-api-key": api_key }
+    headers = {"xi-api-key": api_key}
     response = requests.get(url, headers=headers, timeout=20)
 
     if response.status_code >= 400:
@@ -129,6 +134,7 @@ async def list_models(
             models.append(ModelObject(id=llm))
 
     return ModelListResponse(data=models)
+
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionsResponse)
 async def chat_completions(
@@ -159,7 +165,7 @@ async def chat_completions(
         await websocket.send(json.dumps(build_initiation_payload(req.model, developer_text)))
 
         for text in user_texts:
-            await websocket.send(json.dumps({ "type": "user_message", "text": text }))
+            await websocket.send(json.dumps({"type": "user_message", "text": text}))
 
         async for message in websocket:
             event = json.loads(message)
@@ -169,7 +175,7 @@ async def chat_completions(
                 ping_event = event.get("ping_event", {})
                 event_id = ping_event.get("event_id")
 
-                await websocket.send(json.dumps({ "type": "pong", "event_id": event_id }))
+                await websocket.send(json.dumps({"type": "pong", "event_id": event_id}))
                 continue
 
             if etype == "agent_response":

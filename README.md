@@ -59,7 +59,7 @@ pip install -r requirements.txt
 Start the server:
 
 ```bash
-uvicorn start:app --host 0.0.0.0 --port 10000
+uvicorn src.start:app --host 0.0.0.0 --port 10000
 ```
 
 ## Run with Docker
@@ -134,7 +134,7 @@ Common cases:
 
 ## Project Files
 
-- `start.py` - FastAPI app and endpoint logic
-- `environ.py` - environment loading helper
+- `src/start.py` - FastAPI app and endpoint logic
+- `src/environ.py` - environment loading helper
 - `Dockerfile` - container build/runtime
 - `requirements.txt` - Python dependencies

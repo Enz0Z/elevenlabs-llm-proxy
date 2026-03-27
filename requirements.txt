@@ -3,4 +3,4 @@ pydantic
 requests
 websockets
 uvicorn
-dotenv
+python-dotenv
